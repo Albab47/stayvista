@@ -1,6 +1,7 @@
 import Container from '../Shared/Container'
 import CategoryBox from './CategoryBox'
 import { categories } from './CategoriesData.js'
+
 const Categories = () => {
   return (
     <Container>
