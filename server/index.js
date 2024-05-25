@@ -117,6 +117,28 @@ async function run() {
       res.send(result);
     });
 
+    // Get single user info from db
+    app.get('/users/:email', async(req, res) => {
+      const email = req.params.email;
+      const result = await usersCollection.findOne({email});
+      res.send(result);
+    })
+
+    // Update user role
+    app.patch('/users/update/:email', async(req, res) => {
+      const email = req.params.email;
+      const user = req.body;
+      const filter = {email}
+      const updateDoc = {
+        $set: {
+          ...user,
+          timestamp: Date.now()
+        }
+      }
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    })
+    
     // -------------- Services related API --------------------
 
     // Get all rooms data from db
