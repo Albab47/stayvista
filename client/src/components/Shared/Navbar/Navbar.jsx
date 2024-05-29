@@ -1,5 +1,5 @@
 import Container from "../Container";
-import { AiOutlineMenu, AiOutlineVerticalRight } from "react-icons/ai";
+import { AiOutlineMenu } from "react-icons/ai";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import useAuth from "../../../hooks/useAuth";
@@ -29,10 +29,7 @@ const Navbar = () => {
         role: "guest",
         status: "Requested",
       };
-      const { data } = await axiosSecure.put(
-        `${import.meta.env.VITE_API_URL}/users`,
-        currentUser
-      );
+      const { data } = await axiosSecure.put(`/users`, currentUser);
       console.log(data);
       if (data.modifiedCount > 0) {
         toast.success("Success! Please wait for admin confirmation");
@@ -41,7 +38,7 @@ const Navbar = () => {
       }
     } catch (err) {
       console.log(err);
-      toast.success(err.message);
+      toast.err(err.message);
     } finally {
       closeModal();
     }

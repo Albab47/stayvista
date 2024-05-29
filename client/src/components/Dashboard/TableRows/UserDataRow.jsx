@@ -33,9 +33,6 @@ const UserDataRow = ({ user, refetch }) => {
       toast.error('Action not allowed');
       return setIsOpen(false)
     }
-    if(user?.status === "Verified") {
-      return toast.error('User did not request for Host');
-    }
     console.log("user role updated", selected);
     const role = {
       role: selected,

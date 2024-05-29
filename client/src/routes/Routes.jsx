@@ -12,6 +12,10 @@ import AddRoom from "../pages/Dashboard/Host/AddRoom";
 import MyListings from "../pages/Dashboard/Host/MyListings";
 import Profile from "../pages/Dashboard/Common/Profile";
 import ManageUsers from "../pages/Dashboard/Admin/ManageUsers";
+import AdminRoute from "./AdminRoute";
+import HostRoute from "./HostRoute";
+import MyBookings from "../pages/Dashboard/Guest/MyBookings";
+import ManageBookings from "../pages/Dashboard/Host/ManageBookings";
 
 export const router = createBrowserRouter([
   {
@@ -25,36 +29,64 @@ export const router = createBrowserRouter([
       },
       {
         path: "/room/:id",
-        element: <PrivateRoute><RoomDetails /></PrivateRoute>,
+        element: (
+          <PrivateRoute>
+            <RoomDetails />
+          </PrivateRoute>
+        ),
       },
     ],
   },
   { path: "/login", element: <Login /> },
   { path: "/signup", element: <SignUp /> },
   {
-    path: '/dashboard',
-    element: <DashboardLayout />,
+    path: "/dashboard",
+    element: (
+      <PrivateRoute>
+        <DashboardLayout />
+      </PrivateRoute>
+    ),
     children: [
       {
         index: true,
-        element: <Statistics />
+        element: <Statistics />,
       },
       {
-        path: 'add-room',
-        element: <AddRoom />
+        path: "add-room",
+        element: <HostRoute><AddRoom /></HostRoute>,
       },
       {
-        path: 'my-listings',
-        element: <MyListings />
+        path: "my-listings",
+        element: <HostRoute><MyListings /></HostRoute>,
       },
       {
-        path: 'manage-users',
-        element: <ManageUsers />
+        path: "manage-users",
+        element: (
+          <AdminRoute>
+            <ManageUsers />
+          </AdminRoute>
+        ),
       },
       {
-        path: 'profile',
-        element: <Profile />
+        path: "my-bookings",
+        element: (
+          <PrivateRoute>
+            <MyBookings />
+          </PrivateRoute>
+        ),
       },
-    ]
-  }
+      {
+        path: "manage-bookings",
+        element: (
+          <HostRoute>
+            <ManageBookings />
+          </HostRoute>
+        ),
+      },
+      {
+        path: "profile",
+        element: <Profile />,
+      },
+    ],
+  },
 ]);
