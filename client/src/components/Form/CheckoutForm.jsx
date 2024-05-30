@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import useAxiosSecure from "../../hooks/useAxiosSecure";
 import useAuth from "../../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import toast from 'react-hot-toast';
+import toast from "react-hot-toast";
 
 const CheckoutForm = ({ closeModal, bookingInfo, refetch }) => {
   const stripe = useStripe();
@@ -15,8 +15,7 @@ const CheckoutForm = ({ closeModal, bookingInfo, refetch }) => {
   const [processing, setProcessing] = useState(false);
   const axiosSecure = useAxiosSecure();
   const { user } = useAuth();
-  const navigate = useNavigate()
-
+  const navigate = useNavigate();
 
   useEffect(() => {
     // fetch client secret
@@ -96,22 +95,26 @@ const CheckoutForm = ({ closeModal, bookingInfo, refetch }) => {
         ...bookingInfo,
         roomId: bookingInfo._id,
         transactionId: paymentIntent.id,
-        data: new Date(),
+        date: new Date(),
       };
       delete paymentInfo._id;
       console.log(paymentInfo);
 
       try {
         // 2. save payment info in booking collection db
-        // 3. change room status to booked in db
-        const {data} = await axiosSecure.post('/bookings', paymentInfo);
+        const { data } = await axiosSecure.post("/bookings", paymentInfo);
         console.log(data);
 
+        // 3. change room status to booked in db
+        await axiosSecure.patch(`/room/status/${bookingInfo?._id}`, {
+          status: true,
+        });
+
         // update ui
-        refetch()
-        closeModal()
-        toast.success('Room booked Successfully')
-        navigate('/dashboard/my-bookings')
+        refetch();
+        closeModal();
+        toast.success("Room booked Successfully");
+        navigate("/dashboard/my-bookings");
       } catch (err) {
         console.log(err);
       }
