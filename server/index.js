@@ -5,7 +5,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const port = process.env.PORT || 5000;
 
@@ -108,28 +108,27 @@ async function run() {
     });
 
     // Create payment intent
-    app.post('/create-payment-intent', verifyToken, async(req, res) => {
+    app.post("/create-payment-intent", verifyToken, async (req, res) => {
       const price = req.body.price;
       const priceInCent = parseFloat(price) * 100;
 
-      if(!price || priceInCent < 1) {
-        return
+      if (!price || priceInCent < 1) {
+        return;
       }
 
       // generate client secret
-      const {client_secret} = await stripe.paymentIntents.create({
+      const { client_secret } = await stripe.paymentIntents.create({
         amount: priceInCent,
         currency: "usd",
         // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
         automatic_payment_methods: {
           enabled: true,
         },
-      })
+      });
 
       // send client secret as response
-      res.send({clientSecret: client_secret})
-    })
-
+      res.send({ clientSecret: client_secret });
+    });
 
     // Save user data in db
     app.put("/users", async (req, res) => {
@@ -224,12 +223,17 @@ async function run() {
     });
 
     // Get all rooms from db for host
-    app.get("/my-listings/:email", verifyToken, verifyHost, async (req, res) => {
-      const email = req.params.email;
-      let query = { "host.email": email };
-      const result = await roomsCollection.find(query).toArray();
-      res.send(result);
-    });
+    app.get(
+      "/my-listings/:email",
+      verifyToken,
+      verifyHost,
+      async (req, res) => {
+        const email = req.params.email;
+        let query = { "host.email": email };
+        const result = await roomsCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
 
     // Save a booking data in db
     app.post("/bookings", verifyToken, async (req, res) => {
@@ -237,17 +241,90 @@ async function run() {
       // save room booking info
       const result = await bookingsCollection.insertOne(bookingData);
 
-      // change room availability status
-      const roomId = bookingData?.roomId;
-      const query = {_id: new ObjectId(roomId)};
-      const updateDoc = {
-        $set: {booked: true}
-      }
-      const updateResult = await roomsCollection.updateOne(query, updateDoc);
-      console.log(updateResult);
-      res.send({result, updateResult});
+      res.send(result);
     });
 
+    // update room availability status
+    app.patch("/room/status/:id", async (req, res) => {
+      const id = req.params.id;
+      const status = req.body.status;
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: { booked: status },
+      };
+      const result = await roomsCollection.updateOne(query, updateDoc);
+      console.log(result);
+      res.send(result);
+    });
+
+    // get all booking for a guest
+    app.get("/my-bookings/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { "guest.email": email };
+      const result = await bookingsCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // get all booking for a guest
+    app.get(
+      "/manage-bookings/:email",
+      verifyToken,
+      verifyHost,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { "host.email": email };
+        const result = await bookingsCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
+
+    // Delete a booking
+    app.delete("/bookings/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const result = await bookingsCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+      res.send(result);
+    });
+
+    // Admin statistics - verifyToken, verifyAdmin,
+    app.get("/admin-stats", async (req, res) => {
+      const bookingDetails = await bookingsCollection
+        .find(
+          {},
+          {
+            projection: {
+              date: 1,
+              price: 1,
+            },
+          }
+        )
+        .toArray();
+
+      const totalUser = await usersCollection.countDocuments();
+      const totalRooms = await roomsCollection.countDocuments();
+      const totalBooking = await bookingsCollection.countDocuments();
+      const totalPrice = bookingDetails.reduce((sum, booking) => {
+        return sum + booking.price;
+      }, 0);
+
+      const chartData = bookingDetails.map((booking) => {
+        const day = new Date(booking.date).getDate();
+        const month = new Date(booking.date).getMonth() + 1;
+        return [`${day}/${month}`, booking?.price];
+      });
+
+      chartData.unshift(['Day', 'Sales'])
+      console.log(chartData);
+
+      res.send({
+        totalUser,
+        totalRooms,
+        totalPrice,
+        totalBookings: bookingDetails.length,
+        chartData
+      });
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
