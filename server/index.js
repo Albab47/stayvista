@@ -5,6 +5,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const port = process.env.PORT || 5000;
@@ -36,6 +37,19 @@ const verifyToken = async (req, res, next) => {
     next();
   });
 };
+
+// Send email
+const sendEmail = async(email, emailData) => {
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false, // Use `true` for port 465, `false` for all other ports
+    auth: {
+      user: "maddison53@ethereal.email",
+      pass: "jn7jnAPss4f63QBp6D",
+    },
+  });
+}
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.173efa4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 const client = new MongoClient(uri, {
@@ -222,6 +236,18 @@ async function run() {
       res.send(result);
     });
 
+    // Update room data
+    app.put('/rooms/:id', verifyToken, verifyHost, async(req, res) => {
+      const id = req.params.id;
+      const roomData = req.body;
+      const query = {_id: new ObjectId(id)};
+      const updateDoc = {
+        $set: roomData,
+      }
+      const result = await roomsCollection.updateOne(query, updateDoc);
+      res.send(result)
+    })
+
     // Get all rooms from db for host
     app.get(
       "/my-listings/:email",
@@ -243,6 +269,8 @@ async function run() {
 
       res.send(result);
     });
+
+    
 
     // update room availability status
     app.patch("/room/status/:id", async (req, res) => {
@@ -287,8 +315,8 @@ async function run() {
       res.send(result);
     });
 
-    // Admin statistics - verifyToken, verifyAdmin,
-    app.get("/admin-stats", async (req, res) => {
+    // Admin statistics,
+    app.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
       const bookingDetails = await bookingsCollection
         .find(
           {},
@@ -304,7 +332,7 @@ async function run() {
       const totalUser = await usersCollection.countDocuments();
       const totalRooms = await roomsCollection.countDocuments();
       const totalBooking = await bookingsCollection.countDocuments();
-      const totalPrice = bookingDetails.reduce((sum, booking) => {
+      const totalSales = bookingDetails.reduce((sum, booking) => {
         return sum + booking.price;
       }, 0);
 
@@ -314,18 +342,108 @@ async function run() {
         return [`${day}/${month}`, booking?.price];
       });
 
-      chartData.unshift(['Day', 'Sales'])
+      chartData.unshift(["Day", "Sales"]);
       console.log(chartData);
 
       res.send({
         totalUser,
         totalRooms,
-        totalPrice,
+        totalSales,
         totalBookings: bookingDetails.length,
-        chartData
+        chartData,
       });
     });
 
+    // Host statistics -
+    app.get("/host-stats", verifyToken, verifyHost, async (req, res) => {
+      const { email } = req.user;
+
+      const bookingDetails = await bookingsCollection
+        .find(
+          { 'host.email': email },
+          {
+            projection: {
+              date: 1,
+              price: 1,
+            },
+          }
+        )
+        .toArray();
+
+      const totalRooms = await roomsCollection.countDocuments({
+        "host.email": email,
+      });
+      const totalSales = bookingDetails.reduce((sum, booking) => {
+        return sum + booking.price;
+      }, 0);
+      const {timestamp} = await usersCollection.findOne(
+        { email },
+        {
+          projection: { timestamp: 1 },
+        }
+      );
+      console.log(timestamp);
+
+      const chartData = bookingDetails.map((booking) => {
+        const day = new Date(booking.date).getDate();
+        const month = new Date(booking.date).getMonth() + 1;
+        return [`${day}/${month}`, booking?.price];
+      });
+      chartData.unshift(["Day", "Sales"]);
+      console.log(chartData);
+
+      res.send({
+        totalRooms,
+        totalSales,
+        totalBookings: bookingDetails.length,
+        chartData,
+        hostSince: timestamp,
+      });
+    });
+
+    // Host statistics -
+    app.get("/guest-stats", verifyToken, async (req, res) => {
+      const { email } = req.user;
+
+      const bookingDetails = await bookingsCollection
+        .find(
+          { 'guest.email': email },
+          {
+            projection: {
+              date: 1,
+              price: 1,
+            },
+          }
+        )
+        .toArray();
+
+      const totalPrice = bookingDetails.reduce((sum, booking) => {
+        return sum + booking.price;
+      }, 0);
+      const {timestamp} = await usersCollection.findOne(
+        { email },
+        {
+          projection: { timestamp: 1 },
+        }
+      );
+      console.log(timestamp);
+
+      const chartData = bookingDetails.map((booking) => {
+        const day = new Date(booking.date).getDate();
+        const month = new Date(booking.date).getMonth() + 1;
+        return [`${day}/${month}`, booking?.price];
+      });
+      chartData.unshift(["Day", "Sales"]);
+      console.log(chartData);
+
+      res.send({
+        totalPrice,
+        totalBookings: bookingDetails.length,
+        chartData,
+        guestSince: timestamp,
+      });
+    });
+    
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
